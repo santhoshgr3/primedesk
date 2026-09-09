@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { withAuth, ok, fail, handleError } from "@/lib/api";
+import { cached } from "@/lib/cache";
 import {
   dashboardSnapshot,
   leadSourceReport,
@@ -24,15 +25,27 @@ const REPORTS: Record<string, () => Promise<unknown>> = {
   lost: lostDealReport,
 };
 
+// Reports tolerate ~60s staleness; dashboard refreshes faster.
+const TTL: Record<string, number> = { dashboard: 20_000 };
+
 export async function GET(req: NextRequest) {
   const guard = await withAuth();
   if ("response" in guard) return guard.response;
 
+  // Revenue + operator commission reports are management-only.
+  const name = req.nextUrl.searchParams.get("report") ?? "dashboard";
+  if (
+    ["revenue", "operators"].includes(name) &&
+    !["ADMIN", "OPERATIONS"].includes(guard.user.role)
+  ) {
+    return fail("Forbidden — management report", 403);
+  }
+
   try {
-    const name = req.nextUrl.searchParams.get("report") ?? "dashboard";
     const fn = REPORTS[name];
     if (!fn) return fail(`Unknown report: ${name}`, 400);
-    return ok({ report: name, data: await fn() });
+    const data = await cached(`report:${name}`, TTL[name] ?? 60_000, fn);
+    return ok({ report: name, data });
   } catch (err) {
     return handleError(err);
   }

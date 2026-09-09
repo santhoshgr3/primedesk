@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import {
   BarChart,
   Bar,
@@ -27,18 +28,25 @@ import {
 import { useReport } from "@/hooks/use-crm";
 import { formatINR, titleCase } from "@/lib/utils";
 
-const TABS = [
+const ALL_TABS = [
   { key: "sources", label: "Lead Sources" },
   { key: "advisors", label: "Advisors" },
   { key: "funnel", label: "Funnel" },
   { key: "pipeline", label: "Pipeline" },
-  { key: "operators", label: "Operators" },
-  { key: "revenue", label: "Revenue" },
+  { key: "operators", label: "Operators", mgmt: true },
+  { key: "revenue", label: "Revenue", mgmt: true },
   { key: "demand", label: "Demand" },
   { key: "lost", label: "Lost Deals" },
 ];
 
 export default function ReportsPage() {
+  const { data: session } = useSession();
+  const isMgmt =
+    session?.user?.role === "ADMIN" || session?.user?.role === "OPERATIONS";
+  const TABS = useMemo(
+    () => ALL_TABS.filter((t) => !t.mgmt || isMgmt),
+    [isMgmt],
+  );
   const [tab, setTab] = useState("sources");
   return (
     <div>

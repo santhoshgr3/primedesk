@@ -109,34 +109,56 @@ export async function leadSourceReport() {
 }
 
 export async function advisorReport() {
-  const advisors = await prisma.user.findMany({
-    where: { role: { in: ["ADVISOR", "OPERATIONS"] } },
-    select: { id: true, name: true },
-  });
+  // 5 grouped queries total (was 5 per advisor).
+  const [advisors, enqByAdv, slByAdv, visitByAdv, dealByAdv] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: { in: ["ADVISOR", "OPERATIONS"] } },
+      select: { id: true, name: true },
+    }),
+    prisma.enquiry.groupBy({ by: ["assignedToId"], _count: { _all: true } }),
+    prisma.shortlist.groupBy({
+      by: ["advisorId"],
+      where: { sentAt: { not: null } },
+      _count: { _all: true },
+    }),
+    prisma.visit.groupBy({
+      by: ["advisorId"],
+      where: { status: "done" },
+      _count: { _all: true },
+    }),
+    prisma.deal.groupBy({
+      by: ["advisorId"],
+      where: { stage: "MOVED_IN" },
+      _count: { _all: true },
+      _sum: { commissionValue: true },
+    }),
+  ]);
 
-  const out = [];
-  for (const a of advisors) {
-    const [assigned, shortlists, visitsDone, won, revenue] = await Promise.all([
-      prisma.enquiry.count({ where: { assignedToId: a.id } }),
-      prisma.shortlist.count({ where: { advisorId: a.id, sentAt: { not: null } } }),
-      prisma.visit.count({ where: { advisorId: a.id, status: "done" } }),
-      prisma.deal.count({ where: { advisorId: a.id, stage: "MOVED_IN" } }),
-      prisma.deal.aggregate({
-        where: { advisorId: a.id, stage: "MOVED_IN" },
-        _sum: { commissionValue: true },
-      }),
-    ]);
-    out.push({
-      advisor: a.name,
-      assigned,
-      shortlists,
-      visitsDone,
-      won,
-      conversionPct: assigned ? Math.round((won / assigned) * 100) : 0,
-      revenue: revenue._sum.commissionValue ?? 0,
-    });
-  }
-  return out.sort((a, b) => b.revenue - a.revenue);
+  const enqMap = new Map(enqByAdv.map((r) => [r.assignedToId, r._count._all]));
+  const slMap = new Map(slByAdv.map((r) => [r.advisorId, r._count._all]));
+  const visitMap = new Map(visitByAdv.map((r) => [r.advisorId, r._count._all]));
+  const dealMap = new Map(
+    dealByAdv.map((r) => [
+      r.advisorId,
+      { won: r._count._all, revenue: r._sum.commissionValue ?? 0 },
+    ]),
+  );
+
+  return advisors
+    .map((a) => {
+      const assigned = enqMap.get(a.id) ?? 0;
+      const d = dealMap.get(a.id) ?? { won: 0, revenue: 0 };
+      return {
+        advisor: a.name,
+        assigned,
+        shortlists: slMap.get(a.id) ?? 0,
+        visitsDone: visitMap.get(a.id) ?? 0,
+        won: d.won,
+        conversionPct: assigned ? Math.round((d.won / assigned) * 100) : 0,
+        revenue: d.revenue,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
 }
 
 const FUNNEL_ORDER = [
@@ -203,31 +225,55 @@ export async function pipelineReport() {
 }
 
 export async function operatorReport() {
-  const operators = await prisma.operator.findMany({
-    where: { isActive: true },
-    select: { id: true, name: true, commissionRate: true },
-  });
-  const out = [];
-  for (const o of operators) {
-    const [shortlisted, won, revenue, spaces] = await Promise.all([
-      prisma.shortlistItem.count({ where: { space: { operatorId: o.id } } }),
-      prisma.deal.count({ where: { operatorId: o.id, stage: "MOVED_IN" } }),
-      prisma.deal.aggregate({
-        where: { operatorId: o.id, stage: "MOVED_IN" },
-        _sum: { commissionValue: true },
-      }),
-      prisma.space.count({ where: { operatorId: o.id, isActive: true } }),
-    ]);
-    out.push({
-      operator: o.name,
-      commissionRate: o.commissionRate,
-      spaces,
-      timesShortlisted: shortlisted,
-      dealsWon: won,
-      revenue: revenue._sum.commissionValue ?? 0,
-    });
+  const [operators, spacesByOp, dealByOp] = await Promise.all([
+    prisma.operator.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, commissionRate: true },
+    }),
+    // one row per active space with its shortlist-item count
+    prisma.space.findMany({
+      where: { isActive: true },
+      select: {
+        operatorId: true,
+        _count: { select: { shortlistItems: true } },
+      },
+    }),
+    prisma.deal.groupBy({
+      by: ["operatorId"],
+      where: { stage: "MOVED_IN" },
+      _count: { _all: true },
+      _sum: { commissionValue: true },
+    }),
+  ]);
+
+  const spaceAgg = new Map<string, { spaces: number; shortlisted: number }>();
+  for (const s of spacesByOp) {
+    const cur = spaceAgg.get(s.operatorId) ?? { spaces: 0, shortlisted: 0 };
+    cur.spaces += 1;
+    cur.shortlisted += s._count.shortlistItems;
+    spaceAgg.set(s.operatorId, cur);
   }
-  return out.sort((a, b) => b.revenue - a.revenue);
+  const dealMap = new Map(
+    dealByOp.map((r) => [
+      r.operatorId,
+      { won: r._count._all, revenue: r._sum.commissionValue ?? 0 },
+    ]),
+  );
+
+  return operators
+    .map((o) => {
+      const sp = spaceAgg.get(o.id) ?? { spaces: 0, shortlisted: 0 };
+      const d = dealMap.get(o.id) ?? { won: 0, revenue: 0 };
+      return {
+        operator: o.name,
+        commissionRate: o.commissionRate,
+        spaces: sp.spaces,
+        timesShortlisted: sp.shortlisted,
+        dealsWon: d.won,
+        revenue: d.revenue,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
 }
 
 export async function revenueReport() {
