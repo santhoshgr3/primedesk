@@ -1,0 +1,470 @@
+// PrimeDesk CRM — Prisma schema
+// Office space advisory platform (B2B commercial workspace aggregation)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  ADVISOR
+  OPERATIONS
+  MARKETING
+}
+
+enum EnquiryStatus {
+  NEW
+  ADVISOR_ASSIGNED
+  REQUIREMENT_CALL_DONE
+  SHORTLIST_SENT
+  VISIT_SCHEDULED
+  VISIT_DONE
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
+  PAUSED
+}
+
+enum WorkspaceType {
+  MANAGED_OFFICE
+  COWORKING
+  PLUG_AND_PLAY
+  CUSTOMIZED
+  GCC_ENTERPRISE
+  NOT_SURE
+}
+
+enum EnquirySource {
+  WEBSITE_FORM
+  WHATSAPP_INBOUND
+  LINKEDIN
+  FACEBOOK_ADS
+  INSTAGRAM_ADS
+  GOOGLE_ADS
+  REFERRAL
+  COLD_CALL
+  DIRECT_CALL
+  WALK_IN
+  OTHER
+}
+
+enum DealStage {
+  REQUIREMENT_QUALIFIED
+  SHORTLIST_ACCEPTED
+  VISIT_DONE
+  NEGOTIATING_TERMS
+  DOCUMENTATION
+  LEASE_SIGNED
+  MOVED_IN
+  LOST
+}
+
+enum TaskType {
+  CALL
+  WHATSAPP
+  EMAIL
+  SITE_VISIT
+  SEND_DOCUMENT
+  INTERNAL_MEETING
+  FOLLOW_UP
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ─────────────────────────────────────────────────────────────
+// Core models
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String
+  role         UserRole @default(ADVISOR)
+  city         String?
+  isActive     Boolean  @default(true)
+  profileImage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  enquiries  Enquiry[]      @relation("AssignedEnquiries")
+  tasks      Task[]
+  deals      Deal[]
+  visits     Visit[]
+  shortlists Shortlist[]
+  callLogs   CallLog[]
+  targets    AdvisorTarget[]
+  auditLogs  AuditLog[]
+
+  lastAssignedAt DateTime? // round-robin cursor
+}
+
+model Enquiry {
+  id          String  @id @default(cuid())
+  // Company info
+  companyName String
+  industry    String?
+  companySize Int?
+
+  // Contact person
+  contactName  String
+  contactPhone String
+  contactEmail String?
+  contactDesig String?
+
+  // Requirement
+  seatsNeeded     String
+  city            String
+  microMarket     String?
+  workspaceType   WorkspaceType @default(NOT_SURE)
+  budgetPerSeat   Float?
+  moveInTimeline  String?
+  amenityPriority String[]
+  notes           String?
+
+  // Meta
+  source         EnquirySource @default(OTHER)
+  status         EnquiryStatus @default(NEW)
+  priority       String        @default("warm") // hot | warm | cold
+  assignedToId   String?
+  assignedTo     User?         @relation("AssignedEnquiries", fields: [assignedToId], references: [id])
+  isArchived     Boolean       @default(false)
+  metaLeadId     String?       @unique // dedup key for Meta Lead Ads
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  lastActivityAt DateTime?
+
+  shortlists    Shortlist[]
+  visits        Visit[]
+  deals         Deal[]
+  tasks         Task[]
+  activities    Activity[]
+  messages      Message[]
+  callLogs      CallLog[]
+  statusHistory EnquiryStatusHistory[]
+
+  @@index([status])
+  @@index([city])
+  @@index([assignedToId])
+}
+
+model EnquiryStatusHistory {
+  id         String         @id @default(cuid())
+  enquiryId  String
+  enquiry    Enquiry        @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  fromStatus EnquiryStatus?
+  toStatus   EnquiryStatus
+  changedBy  String
+  note       String?
+  createdAt  DateTime       @default(now())
+}
+
+model Operator {
+  id             String   @id @default(cuid())
+  name           String
+  type           String   @default("independent") // national_chain | regional | independent
+  website        String?
+  commissionRate Float?
+  rating         Int?
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  contacts OperatorContact[]
+  spaces   Space[]
+  deals    Deal[]
+}
+
+model OperatorContact {
+  id          String   @id @default(cuid())
+  operatorId  String
+  operator    Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  name        String
+  designation String?
+  phone       String
+  email       String?
+  isPrimary   Boolean  @default(false)
+}
+
+model Space {
+  id             String        @id @default(cuid())
+  operatorId     String
+  operator       Operator      @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  name           String
+  city           String
+  microMarket    String
+  address        String
+  latitude       Float?
+  longitude      Float?
+  workspaceType  WorkspaceType @default(MANAGED_OFFICE)
+  totalSeats     Int
+  availableSeats Int
+  areaSqft       Float?
+  floor          String?
+  building       String?
+
+  // Pricing
+  pricePerSeat  Float
+  lockInMonths  Int?
+  depositMonths Int?
+  includedItems String[]
+  addOnItems    String[]
+
+  // Media
+  images         String[]
+  brochureUrl    String?
+  virtualTourUrl String?
+
+  // Status
+  status         String   @default("active") // active | full | waitlisted | inactive
+  moveInReady    String   @default("ready") // ready | 2_weeks | 1_month
+  lastVerifiedAt DateTime?
+  isActive       Boolean  @default(true)
+  amenities      String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  shortlistItems ShortlistItem[]
+  visits         Visit[]
+  deals          Deal[]
+
+  @@index([city])
+  @@index([workspaceType])
+}
+
+model Shortlist {
+  id        String    @id @default(cuid())
+  enquiryId String
+  enquiry   Enquiry   @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  advisorId String
+  advisor   User      @relation(fields: [advisorId], references: [id])
+  pdfUrl    String?
+  sentVia   String[]
+  sentAt    DateTime?
+  response  String?
+  clientNote String?
+  version   Int       @default(1)
+  createdAt DateTime  @default(now())
+
+  items ShortlistItem[]
+}
+
+model ShortlistItem {
+  id          String    @id @default(cuid())
+  shortlistId String
+  shortlist   Shortlist @relation(fields: [shortlistId], references: [id], onDelete: Cascade)
+  spaceId     String
+  space       Space     @relation(fields: [spaceId], references: [id])
+  advisorNote String?
+  rank        Int
+}
+
+model Visit {
+  id              String   @id @default(cuid())
+  enquiryId       String
+  enquiry         Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  spaceId         String
+  space           Space    @relation(fields: [spaceId], references: [id])
+  advisorId       String
+  advisor         User     @relation(fields: [advisorId], references: [id])
+  operatorContact String?
+  scheduledAt     DateTime
+  type            String   @default("physical") // physical | virtual | video_walkthrough
+  status          String   @default("scheduled") // scheduled | confirmed | done | no_show | cancelled | rescheduled
+  outcome         String?  // interested | not_interested | needs_another | revisit
+  clientFeedback  String?
+  nextStep        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Deal {
+  id        String    @id @default(cuid())
+  enquiryId String
+  enquiry   Enquiry   @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  spaceId   String
+  space     Space     @relation(fields: [spaceId], references: [id])
+  operatorId String
+  operator  Operator  @relation(fields: [operatorId], references: [id])
+  advisorId String
+  advisor   User      @relation(fields: [advisorId], references: [id])
+  stage     DealStage @default(REQUIREMENT_QUALIFIED)
+
+  // Commercial terms
+  seats        Int
+  pricePerSeat Float
+  monthlyValue Float
+  lockInMonths Int?
+  depositPaid  Float?
+  startDate    DateTime?
+
+  // Commission
+  commissionRate   Float?
+  commissionValue  Float?
+  commissionStatus String @default("pending") // pending | invoiced | received
+
+  // Co-broker (external channel partner) — split commission
+  isCoBroker    Boolean @default(false)
+  coBrokerName  String?
+  coBrokerSplit Float?  // % of commission that goes to the co-broker
+
+  lostReason String?
+  notes      String?
+  movedInAt  DateTime?
+
+  documents    Document[]
+  stageHistory DealStageHistory[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([stage])
+}
+
+model Task {
+  id           String    @id @default(cuid())
+  type         TaskType  @default(FOLLOW_UP)
+  title        String
+  description  String?
+  priority     Priority  @default(MEDIUM)
+  dueDate      DateTime
+  enquiryId    String?
+  enquiry      Enquiry?  @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  assignedToId String
+  assignedTo   User      @relation(fields: [assignedToId], references: [id])
+  status       String    @default("pending") // pending | done | cancelled
+  outcome      String?   // connected | no_answer | interested | not_now | lost
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([status])
+  @@index([assignedToId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  enquiryId  String
+  enquiry    Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  channel    String   // whatsapp | email | sms
+  direction  String   // outbound | inbound
+  content    String
+  templateId String?
+  status     String   @default("sent") // sent | delivered | read | failed
+  sentAt     DateTime @default(now())
+  sentBy     String?
+}
+
+model MessageTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  channel   String   @default("whatsapp")
+  body      String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  enquiryId   String
+  enquiry     Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  type        String   // call | whatsapp | email | shortlist_sent | visit_scheduled | deal_update | note | status_change
+  description String
+  outcome     String?
+  performedBy String
+  createdAt   DateTime @default(now())
+
+  @@index([enquiryId])
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  name       String
+  type       String   // loi | lease_agreement | company_kyc | brochure | other
+  url        String
+  dealId     String?
+  deal       Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  uploadedBy String
+  createdAt  DateTime @default(now())
+}
+
+model DealStageHistory {
+  id        String     @id @default(cuid())
+  dealId    String
+  deal      Deal       @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  fromStage DealStage?
+  toStage   DealStage
+  changedBy String
+  createdAt DateTime   @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phase 3–6 models
+// ─────────────────────────────────────────────────────────────
+
+model CallLog {
+  id         String   @id @default(cuid())
+  enquiryId  String
+  enquiry    Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  direction  String   @default("outbound") // outbound | inbound
+  outcome    String   // connected | no_answer | busy | wrong_number | voicemail
+  durationSec Int     @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  @@index([enquiryId])
+}
+
+/// Key/value store for system configuration (branding, rules, working hours).
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String   // setting.update | enquiry.bulk_assign | template.update | ...
+  entity     String?  // e.g. "enquiry:abc123"
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model AdvisorTarget {
+  id             String   @id @default(cuid())
+  advisorId      String
+  advisor        User     @relation(fields: [advisorId], references: [id], onDelete: Cascade)
+  month          String   // "2026-09"
+  shortlistsGoal Int      @default(0)
+  visitsGoal     Int      @default(0)
+  dealsGoal      Int      @default(0)
+  revenueGoal    Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([advisorId, month])
+}
