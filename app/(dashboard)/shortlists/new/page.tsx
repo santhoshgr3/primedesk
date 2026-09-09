@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { api, useMatchedSpaces } from "@/hooks/use-crm";
+import { ShareLinkButton } from "@/components/shortlists/share-link";
 import { formatINR, titleCase } from "@/lib/utils";
 
 type Selected = { spaceId: string; advisorNote: string };
@@ -278,6 +279,12 @@ function Builder() {
                   <Button size="sm" variant="outline" onClick={() => send(["whatsapp", "email"])} disabled={busy}>
                     Both
                   </Button>
+                </div>
+                <div className="border-t border-green-200 pt-2">
+                  <ShareLinkButton shortlistId={createdId} />
+                  <p className="mt-1 text-[11px] text-green-700">
+                    Interactive page where the client ticks spaces & requests a visit.
+                  </p>
                 </div>
               </div>
             )}

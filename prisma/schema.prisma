@@ -142,6 +142,8 @@ model Enquiry {
   source         EnquirySource @default(OTHER)
   status         EnquiryStatus @default(NEW)
   priority       String        @default("warm") // hot | warm | cold
+  score          Int?          // 0–100 auto lead score (drives priority)
+  scoredAt       DateTime?
   assignedToId   String?
   assignedTo     User?         @relation("AssignedEnquiries", fields: [assignedToId], references: [id])
   isArchived     Boolean       @default(false)
@@ -261,6 +263,8 @@ model Shortlist {
   response  String?
   clientNote String?
   version   Int       @default(1)
+  shareToken String?  @unique // public client-facing link
+  viewedAt   DateTime? // when the client first opened the shared link
   createdAt DateTime  @default(now())
 
   items ShortlistItem[]
@@ -274,6 +278,7 @@ model ShortlistItem {
   space       Space     @relation(fields: [spaceId], references: [id])
   advisorNote String?
   rank        Int
+  clientPreferred Boolean @default(false) // client ticked this on the shared link
 }
 
 model Visit {

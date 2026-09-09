@@ -1,6 +1,17 @@
 # Build Progress
 
-Implementation status against [PLAN.md](PLAN.md). **All 11 modules built.**
+Implementation status against [PLAN.md](PLAN.md). **All 11 modules built + extensions.**
+
+## ✨ Extensions (beyond the plan)
+
+| Feature | What it does |
+|---------|--------------|
+| **Public client shortlist link** | `POST /api/shortlists/:id/share` mints a token → `/s/<token>` is a branded, no-login page where the client ticks the spaces they like and requests a visit. Submitting writes `clientPreferred` on the items, sets the shortlist response, logs the client's words on the enquiry timeline, and auto-creates a HIGH task for the advisor. Advisor UI shows "client picked" badges + when the link was opened. |
+| **Lead scoring engine** | `lib/services/scoring.ts` — 0–100 score from seats + move-in timeline + budget + source + engagement (touchpoints, shortlist/visit progress, recency decay) → drives Hot/Warm/Cold. Runs on create, on every status change, on demand ("Rescore" on the enquiry, shows the point breakdown), and nightly via `POST /api/cron/rescore`. |
+| **Global search** | Topbar search is now live — `GET /api/search?q=` across enquiries, operators and spaces with a grouped dropdown. |
+| **Duplicate detection** | New-enquiry form checks phone (last-10 digits) + company name on blur (`GET /api/enquiries/check-duplicate`) and shows matching enquiries inline before you create a dupe. |
+| **Saved filter views** | Enquiries page has preset chips (New / Unassigned / My enquiries / Hot leads / Awaiting response / In negotiation) plus "Save view" for custom filter combos (localStorage). |
+| **Full-field quick create** | `POST /api/enquiries` now persists industry, size, micro-market, budget, timeline, amenities & notes (previously dropped by the quick schema). |
 
 ## ✅ Phase 1 — Foundation
 

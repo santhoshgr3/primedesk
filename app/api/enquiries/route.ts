@@ -2,8 +2,9 @@ import type { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { withAuth, ok, handleError, parsePagination } from "@/lib/api";
-import { quickEnquirySchema } from "@/lib/validators/enquiry";
+import { fullEnquirySchema } from "@/lib/validators/enquiry";
 import { logActivity } from "@/lib/services/enquiry";
+import { scoreEnquiry } from "@/lib/services/scoring";
 
 export async function GET(req: NextRequest) {
   const guard = await withAuth();
@@ -59,30 +60,34 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const data = quickEnquirySchema.parse(body);
+    const data = fullEnquirySchema.parse(body);
 
     const enquiry = await prisma.enquiry.create({
       data: {
         companyName: data.companyName,
+        industry: data.industry || null,
+        companySize: data.companySize ?? null,
         contactName: data.contactName,
         contactPhone: data.contactPhone,
         contactEmail: data.contactEmail || null,
+        contactDesig: data.contactDesig || null,
         seatsNeeded: data.seatsNeeded,
         city: data.city,
+        microMarket: data.microMarket || null,
         workspaceType: data.workspaceType,
+        budgetPerSeat: data.budgetPerSeat ?? null,
+        moveInTimeline: data.moveInTimeline || null,
+        amenityPriority: data.amenityPriority ?? [],
+        notes: data.notes || null,
         source: data.source,
+        priority: data.priority,
         assignedToId: data.assignedToId || null,
         status: data.assignedToId ? "ADVISOR_ASSIGNED" : "NEW",
         lastActivityAt: new Date(),
       },
     });
 
-    await logActivity(
-      enquiry.id,
-      "note",
-      "Enquiry created",
-      guard.user.id,
-    );
+    await logActivity(enquiry.id, "note", "Enquiry created", guard.user.id);
 
     // SLA task: call within 2 hours
     const dueDate = new Date();
@@ -98,7 +103,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return ok(enquiry, { status: 201 });
+    const scored = await scoreEnquiry(enquiry.id).catch(() => null);
+
+    return ok({ ...enquiry, ...(scored ?? {}) }, { status: 201 });
   } catch (err) {
     return handleError(err);
   }

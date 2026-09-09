@@ -1,0 +1,124 @@
+import type { NextRequest } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { ok, fail, handleError } from "@/lib/api";
+import { logActivity } from "@/lib/services/enquiry";
+
+/** Public — no auth. The client's browser reads the shortlist by token. */
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { token: string } },
+) {
+  try {
+    const shortlist = await prisma.shortlist.findUnique({
+      where: { shareToken: params.token },
+      include: {
+        enquiry: { select: { companyName: true, contactName: true, city: true } },
+        advisor: { select: { name: true, phone: true, email: true } },
+        items: {
+          orderBy: { rank: "asc" },
+          include: {
+            space: {
+              include: { operator: { select: { name: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!shortlist) return fail("Link not found or expired", 404);
+
+    if (!shortlist.viewedAt) {
+      await prisma.shortlist.update({
+        where: { id: shortlist.id },
+        data: { viewedAt: new Date() },
+      });
+      await logActivity(
+        shortlist.enquiryId,
+        "note",
+        `Client opened the shared shortlist (v${shortlist.version})`,
+        "system",
+      );
+    }
+
+    return ok(shortlist);
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+const bodySchema = z.object({
+  preferredSpaceIds: z.array(z.string()).max(6),
+  note: z.string().max(2000).optional(),
+  wantsVisit: z.boolean().optional().default(false),
+});
+
+/** Public — the client submits their picks. */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { token: string } },
+) {
+  try {
+    const { preferredSpaceIds, note, wantsVisit } = bodySchema.parse(
+      await req.json(),
+    );
+
+    const shortlist = await prisma.shortlist.findUnique({
+      where: { shareToken: params.token },
+      include: { items: true, enquiry: true },
+    });
+    if (!shortlist) return fail("Link not found", 404);
+
+    await prisma.$transaction([
+      prisma.shortlistItem.updateMany({
+        where: { shortlistId: shortlist.id },
+        data: { clientPreferred: false },
+      }),
+      prisma.shortlistItem.updateMany({
+        where: { shortlistId: shortlist.id, spaceId: { in: preferredSpaceIds } },
+        data: { clientPreferred: true },
+      }),
+      prisma.shortlist.update({
+        where: { id: shortlist.id },
+        data: {
+          response: wantsVisit
+            ? "wants_visit"
+            : preferredSpaceIds.length
+              ? "interested_in_X"
+              : "not_suitable",
+          clientNote: note || null,
+        },
+      }),
+    ]);
+
+    const picked = shortlist.items
+      .filter((i) => preferredSpaceIds.includes(i.spaceId))
+      .length;
+
+    await logActivity(
+      shortlist.enquiryId,
+      "note",
+      `Client responded via shared link — ${picked} space(s) preferred${
+        wantsVisit ? ", wants a visit" : ""
+      }${note ? `: "${note}"` : ""}`,
+      "system",
+    );
+
+    // Nudge the advisor.
+    await prisma.task.create({
+      data: {
+        type: wantsVisit ? "SITE_VISIT" : "FOLLOW_UP",
+        title: wantsVisit
+          ? `${shortlist.enquiry.companyName}: client wants a visit — coordinate`
+          : `${shortlist.enquiry.companyName}: client picked ${picked} space(s) — follow up`,
+        dueDate: new Date(Date.now() + 4 * 3600 * 1000),
+        enquiryId: shortlist.enquiryId,
+        assignedToId: shortlist.advisorId,
+        priority: "HIGH",
+      },
+    });
+
+    return ok({ received: true });
+  } catch (err) {
+    return handleError(err);
+  }
+}

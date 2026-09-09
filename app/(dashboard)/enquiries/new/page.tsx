@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { api } from "@/hooks/use-crm";
+import { timeAgo, titleCase } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +35,24 @@ export default function NewEnquiryPage() {
   const [saving, setSaving] = useState(false);
   const [amenities, setAmenities] = useState<string[]>([]);
   const [city, setCity] = useState("");
+  const [dupes, setDupes] = useState<any[]>([]);
+
+  async function checkDuplicate(company: string, phone: string) {
+    if (company.trim().length < 3 && phone.replace(/\D/g, "").length < 7) {
+      setDupes([]);
+      return;
+    }
+    try {
+      const res = await api.jsonFetch<{ matches: any[] }>(
+        `/api/enquiries/check-duplicate?company=${encodeURIComponent(
+          company,
+        )}&phone=${encodeURIComponent(phone)}`,
+      );
+      setDupes(res.matches);
+    } catch {
+      /* non-blocking */
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -91,6 +113,34 @@ export default function NewEnquiryPage() {
         description="Capture the requirement. Only company, contact, seats & city are required — fill the rest after the requirement call."
       />
 
+      {dupes.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <p className="flex items-center gap-2 text-sm font-medium text-amber-800">
+            <AlertTriangle className="size-4" />
+            {dupes.length} possible duplicate{dupes.length > 1 ? "s" : ""} —
+            check before creating a new enquiry
+          </p>
+          <ul className="mt-2 space-y-1">
+            {dupes.map((d) => (
+              <li key={d.id} className="text-sm">
+                <Link
+                  href={`/enquiries/${d.id}`}
+                  target="_blank"
+                  className="font-medium text-amber-900 underline"
+                >
+                  {d.companyName}
+                </Link>{" "}
+                <span className="text-amber-700">
+                  · {d.contactName} · {d.contactPhone} · {titleCase(d.status)}
+                  {d.assignedTo ? ` · ${d.assignedTo.name}` : ""} ·{" "}
+                  {timeAgo(d.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <form onSubmit={onSubmit} className="space-y-6">
         <Card>
           <CardHeader>
@@ -98,7 +148,20 @@ export default function NewEnquiryPage() {
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Company name" required>
-              <Input name="companyName" required />
+              <Input
+                name="companyName"
+                required
+                onBlur={(e) =>
+                  checkDuplicate(
+                    e.target.value,
+                    (
+                      e.currentTarget.form?.elements.namedItem(
+                        "contactPhone",
+                      ) as HTMLInputElement
+                    )?.value ?? "",
+                  )
+                }
+              />
             </Field>
             <Field label="Industry">
               <Select name="industry" placeholder="Select industry">
@@ -127,7 +190,21 @@ export default function NewEnquiryPage() {
               <Input name="contactDesig" placeholder="HR Head, Admin, CEO…" />
             </Field>
             <Field label="Phone (WhatsApp)" required>
-              <Input name="contactPhone" required placeholder="+91…" />
+              <Input
+                name="contactPhone"
+                required
+                placeholder="+91…"
+                onBlur={(e) =>
+                  checkDuplicate(
+                    (
+                      e.currentTarget.form?.elements.namedItem(
+                        "companyName",
+                      ) as HTMLInputElement
+                    )?.value ?? "",
+                    e.target.value,
+                  )
+                }
+              />
             </Field>
             <Field label="Email">
               <Input name="contactEmail" type="email" />

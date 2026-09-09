@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Download } from "lucide-react";
+import { Plus, Download, Star, X } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -35,21 +36,85 @@ const PRIORITY_DOT: Record<string, string> = {
   cold: "bg-sky-500",
 };
 
+type Filters = {
+  q: string;
+  city: string;
+  status: string;
+  workspaceType: string;
+  assignedToId: string;
+  priority: string;
+};
+
+const EMPTY: Filters = {
+  q: "",
+  city: "",
+  status: "",
+  workspaceType: "",
+  assignedToId: "",
+  priority: "",
+};
+
+const VIEWS_KEY = "primedesk.enquiryViews";
+
 export default function EnquiriesPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { data: session } = useSession();
   const { data: advisors } = useAdvisors();
 
-  const [filters, setFilters] = useState({
-    q: "",
-    city: "",
-    status: "",
-    workspaceType: "",
-    assignedToId: "",
-    priority: "",
-  });
+  const [filters, setFilters] = useState<Filters>(EMPTY);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [customViews, setCustomViews] = useState<
+    { name: string; filters: Filters }[]
+  >([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(VIEWS_KEY);
+      if (raw) setCustomViews(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const presets: { name: string; filters: Partial<Filters> }[] = [
+    { name: "All", filters: {} },
+    { name: "New", filters: { status: "NEW" } },
+    { name: "Unassigned", filters: { assignedToId: "unassigned" } },
+    ...(session?.user?.id
+      ? [{ name: "My enquiries", filters: { assignedToId: session.user.id } }]
+      : []),
+    { name: "Hot leads", filters: { priority: "hot" } },
+    { name: "Awaiting response", filters: { status: "SHORTLIST_SENT" } },
+    { name: "In negotiation", filters: { status: "NEGOTIATION" } },
+  ];
+
+  const applyView = (f: Partial<Filters>) => {
+    setSelected(new Set());
+    setFilters({ ...EMPTY, ...f });
+  };
+
+  const activePreset = (f: Partial<Filters>) =>
+    JSON.stringify({ ...EMPTY, ...f }) === JSON.stringify(filters);
+
+  const saveView = () => {
+    const name = prompt("Name this view:");
+    if (!name) return;
+    const next = [
+      ...customViews.filter((v) => v.name !== name),
+      { name, filters },
+    ];
+    setCustomViews(next);
+    localStorage.setItem(VIEWS_KEY, JSON.stringify(next));
+    toast({ title: `Saved view “${name}”`, variant: "success" });
+  };
+
+  const deleteView = (name: string) => {
+    const next = customViews.filter((v) => v.name !== name);
+    setCustomViews(next);
+    localStorage.setItem(VIEWS_KEY, JSON.stringify(next));
+  };
 
   const params = useMemo(() => ({ ...filters, pageSize: "50" }), [filters]);
   const { data, isLoading, isError } = useEnquiries(params);
@@ -114,6 +179,43 @@ export default function EnquiriesPage() {
           </div>
         }
       />
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        {presets.map((p) => (
+          <button
+            key={p.name}
+            onClick={() => applyView(p.filters)}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              activePreset(p.filters)
+                ? "border-primary bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            {p.name}
+          </button>
+        ))}
+        {customViews.map((v) => (
+          <span
+            key={v.name}
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${
+              activePreset(v.filters)
+                ? "border-primary bg-primary/10 text-primary"
+                : "text-muted-foreground"
+            }`}
+          >
+            <button onClick={() => applyView(v.filters)}>{v.name}</button>
+            <button onClick={() => deleteView(v.name)} title="Delete view">
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        <button
+          onClick={saveView}
+          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <Star className="size-3" /> Save view
+        </button>
+      </div>
 
       <Card className="mb-4 p-3">
         <div className="grid gap-2 md:grid-cols-3 lg:grid-cols-6">

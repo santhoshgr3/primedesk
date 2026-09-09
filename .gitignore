@@ -20,3 +20,6 @@ next-env.d.ts
 *.log
 .tsbuildinfo
 tsconfig.tsbuildinfo
+
+# stray desktop output folder
+Claude outputs/

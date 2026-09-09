@@ -16,6 +16,7 @@ import { StatusChanger } from "@/components/enquiries/status-changer";
 import { AssignAdvisor } from "@/components/enquiries/assign-advisor";
 import { Timeline } from "@/components/enquiries/timeline";
 import { EnquiryActions } from "@/components/enquiries/enquiry-actions";
+import { LeadScore } from "@/components/enquiries/lead-score";
 import { formatINR, timeAgo, titleCase } from "@/lib/utils";
 import { ENQUIRY_STATUS_META, PRIORITY_META } from "@/lib/constants";
 
@@ -151,6 +152,22 @@ export default async function EnquiryDetailPage({
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Lead Score</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LeadScore
+                enquiryId={enquiry.id}
+                score={enquiry.score}
+                priority={enquiry.priority}
+                scoredAt={
+                  enquiry.scoredAt ? enquiry.scoredAt.toISOString() : null
+                }
+              />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Contact</CardTitle>

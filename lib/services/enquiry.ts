@@ -3,6 +3,7 @@ import type { EnquiryStatus, Prisma, WorkspaceType, EnquirySource } from "@prism
 import { pickAdvisor } from "@/lib/services/assignment";
 import { getSettings } from "@/lib/settings";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
+import { scoreEnquiry } from "@/lib/services/scoring";
 
 /**
  * Auto-task rules — every status transition should leave the enquiry with a
@@ -119,6 +120,9 @@ export async function changeStatus(
     return e;
   });
 
+  // Engagement changed — recompute the lead score.
+  await scoreEnquiry(enquiryId).catch(() => {});
+
   return updated;
 }
 
@@ -214,6 +218,8 @@ export async function createInboundEnquiry(input: InboundInput) {
       templateId: "welcome_enquiry",
     },
   });
+
+  await scoreEnquiry(enquiry.id).catch(() => {});
 
   return enquiry;
 }
