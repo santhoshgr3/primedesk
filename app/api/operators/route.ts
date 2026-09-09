@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { withAuth, ok, handleError } from "@/lib/api";
 import { operatorSchema } from "@/lib/validators/operator";
+import { serializeOperators } from "@/lib/serializers";
 
 export async function GET(req: NextRequest) {
   const guard = await withAuth();
@@ -23,14 +24,14 @@ export async function GET(req: NextRequest) {
         _count: { select: { spaces: true, deals: true } },
       },
     });
-    return ok(operators);
+    return ok(serializeOperators(operators, guard.user.role));
   } catch (err) {
     return handleError(err);
   }
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','OPERATIONS']);
   if ("response" in guard) return guard.response;
   if (!["ADMIN", "OPERATIONS"].includes(guard.user.role))
     return ok({ error: "Forbidden" }, { status: 403 });

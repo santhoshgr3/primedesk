@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 import { createInboundEnquiry } from "@/lib/services/enquiry";
+import { verifyMetaSignature } from "@/lib/webhook-verify";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
@@ -18,8 +20,24 @@ export function GET(req: NextRequest) {
  * { fields: {...}, leadId } shape (used by the CRM's own test form).
  */
 export async function POST(req: NextRequest) {
+  const limited = enforceRateLimit(req, "wh:meta", {
+    limit: 120,
+    windowMs: 60_000,
+  });
+  if (limited) return limited;
+
   try {
-    const body = await req.json();
+    const raw = await req.text();
+    if (
+      !verifyMetaSignature(
+        raw,
+        req.headers.get("x-hub-signature-256"),
+        process.env.META_APP_SECRET,
+      )
+    ) {
+      return new Response("Invalid signature", { status: 401 });
+    }
+    const body = JSON.parse(raw || "{}");
 
     // Normalised shape
     if (body.fields) {

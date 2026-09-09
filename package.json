@@ -11,9 +11,12 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:force": "cross-env ALLOW_SEED=1 tsx prisma/seed.ts",
     "db:push": "prisma db push",
     "db:local": "node scripts/db-embedded.mjs start",
-    "db:reset": "prisma migrate reset --force && npm run db:seed",
+    "db:reset": "prisma migrate reset --force && npm run db:seed:force",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write ."
   },
   "prisma": {
@@ -53,7 +56,9 @@
     "@types/node": "^20.16.10",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^7.0.3",
     "embedded-postgres": "^18.4.0-beta.17",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.13",
@@ -62,7 +67,8 @@
     "prisma": "^5.20.0",
     "tailwindcss": "^3.4.13",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.8"
   },
   "allowScripts": {
     "@prisma/client@5.22.0": true,
@@ -70,6 +76,7 @@
     "esbuild@0.28.2": true,
     "prisma@5.22.0": true,
     "unrs-resolver@1.12.2": true,
-    "@embedded-postgres/windows-x64@18.4.0-beta.17": true
+    "@embedded-postgres/windows-x64@18.4.0-beta.17": true,
+    "esbuild@0.21.5": true
   }
 }

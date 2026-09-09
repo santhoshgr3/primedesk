@@ -64,6 +64,7 @@ export default async function ShortlistDetailPage({
           <ShareLinkButton
             shortlistId={shortlist.id}
             existingToken={shortlist.shareToken}
+            revoked={shortlist.shareRevoked}
           />
           <a
             href={`/api/shortlists/${shortlist.id}/pdf`}

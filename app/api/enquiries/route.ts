@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','ADVISOR','MARKETING']);
   if ("response" in guard) return guard.response;
 
   try {

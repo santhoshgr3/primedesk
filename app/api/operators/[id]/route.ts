@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withAuth, ok, fail, handleError } from "@/lib/api";
 import { updateOperatorSchema } from "@/lib/validators/operator";
+import { serializeOperator } from "@/lib/serializers";
 
 export async function GET(
   _req: NextRequest,
@@ -25,7 +26,7 @@ export async function GET(
       },
     });
     if (!operator) return fail("Not found", 404);
-    return ok(operator);
+    return ok(serializeOperator(operator, guard.user.role));
   } catch (err) {
     return handleError(err);
   }
@@ -35,7 +36,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','OPERATIONS']);
   if ("response" in guard) return guard.response;
 
   try {
@@ -77,7 +78,7 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN']);
   if ("response" in guard) return guard.response;
   if (guard.user.role !== "ADMIN") return fail("Forbidden", 403);
 

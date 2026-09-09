@@ -21,7 +21,7 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','ADVISOR','MARKETING']);
   if ("response" in guard) return guard.response;
   if (!["ADMIN", "MARKETING", "ADVISOR"].includes(guard.user.role))
     return fail("Forbidden", 403);

@@ -7,7 +7,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','ADVISOR','MARKETING','OPERATIONS']);
   if ("response" in guard) return guard.response;
 
   try {

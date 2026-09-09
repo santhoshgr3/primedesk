@@ -263,11 +263,17 @@ model Shortlist {
   response  String?
   clientNote String?
   version   Int       @default(1)
-  shareToken String?  @unique // public client-facing link
-  viewedAt   DateTime? // when the client first opened the shared link
-  createdAt DateTime  @default(now())
+  shareToken     String?   @unique // public client-facing link
+  shareExpiresAt DateTime? // link auto-expires
+  shareRevoked   Boolean   @default(false)
+  viewedAt       DateTime? // when the client first opened the shared link
+  createdAt      DateTime  @default(now())
 
   items ShortlistItem[]
+
+  @@index([enquiryId])
+  @@index([advisorId])
+  @@index([sentAt])
 }
 
 model ShortlistItem {
@@ -298,6 +304,11 @@ model Visit {
   nextStep        String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([enquiryId])
+  @@index([advisorId])
+  @@index([scheduledAt])
+  @@index([status])
 }
 
 model Deal {
@@ -340,6 +351,9 @@ model Deal {
   updatedAt    DateTime           @updatedAt
 
   @@index([stage])
+  @@index([advisorId])
+  @@index([operatorId])
+  @@index([movedInAt])
 }
 
 model Task {
@@ -360,6 +374,7 @@ model Task {
 
   @@index([status])
   @@index([assignedToId])
+  @@index([dueDate])
 }
 
 model Message {
@@ -373,6 +388,9 @@ model Message {
   status     String   @default("sent") // sent | delivered | read | failed
   sentAt     DateTime @default(now())
   sentBy     String?
+
+  @@index([enquiryId])
+  @@index([sentAt])
 }
 
 model MessageTemplate {
@@ -397,6 +415,7 @@ model Activity {
   createdAt   DateTime @default(now())
 
   @@index([enquiryId])
+  @@index([createdAt])
 }
 
 model Document {

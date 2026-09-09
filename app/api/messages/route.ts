@@ -58,7 +58,7 @@ const sendSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','ADVISOR','MARKETING']);
   if ("response" in guard) return guard.response;
 
   try {

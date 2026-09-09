@@ -1,11 +1,18 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withAuth, ok, handleError } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /** Global search across enquiries, operators and spaces (topbar). */
 export async function GET(req: NextRequest) {
   const guard = await withAuth();
   if ("response" in guard) return guard.response;
+
+  const limited = enforceRateLimit(req, "search", {
+    limit: 120,
+    windowMs: 60_000,
+  });
+  if (limited) return limited;
 
   try {
     const q = req.nextUrl.searchParams.get("q")?.trim();

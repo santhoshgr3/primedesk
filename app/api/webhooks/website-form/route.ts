@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { createInboundEnquiry } from "@/lib/services/enquiry";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const schema = z.object({
   companyName: z.string().min(1),
@@ -26,6 +27,12 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const limited = enforceRateLimit(req, "wh:form", {
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (limited) return limited;
+
   try {
     const data = schema.parse(await req.json());
     const enquiry = await createInboundEnquiry({

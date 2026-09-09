@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { formatINR, timeAgo, titleCase } from "@/lib/utils";
 import { OperatorSpacesActions } from "@/components/operators/operator-detail-actions";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,8 @@ export default async function OperatorDetailPage({
 }: {
   params: { id: string };
 }) {
+  const user = await requireUser();
+  const canSeeCommission = user.role === "ADMIN" || user.role === "OPERATIONS";
   const operator = await prisma.operator.findUnique({
     where: { id: params.id },
     include: {
@@ -62,10 +65,14 @@ export default async function OperatorDetailPage({
             </span>
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {titleCase(operator.type)} ·{" "}
-            {operator.commissionRate != null
-              ? `${operator.commissionRate}% commission`
-              : "commission not set"}{" "}
+            {titleCase(operator.type)}
+            {canSeeCommission
+              ? ` · ${
+                  operator.commissionRate != null
+                    ? `${operator.commissionRate}% commission`
+                    : "commission not set"
+                }`
+              : ""}{" "}
             · {operator.spaces.length} spaces
           </p>
         </div>
@@ -143,9 +150,11 @@ export default async function OperatorDetailPage({
                   </div>
                   <div className="text-right">
                     <Badge>{titleCase(d.stage)}</Badge>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatINR(d.commissionValue ?? 0, { short: true })} comm.
-                    </p>
+                    {canSeeCommission && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatINR(d.commissionValue ?? 0, { short: true })} comm.
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -201,7 +210,12 @@ export default async function OperatorDetailPage({
               <CardTitle className="text-base">Snapshot</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1 text-sm">
-              <Row label="Won commission" value={formatINR(wonCommission, { short: true })} />
+              {canSeeCommission && (
+                <Row
+                  label="Won commission"
+                  value={formatINR(wonCommission, { short: true })}
+                />
+              )}
               <Row
                 label="Deals won"
                 value={operator.deals.filter((d) => d.stage === "MOVED_IN").length}

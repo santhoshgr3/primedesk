@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { recordMessage } from "@/lib/services/messaging";
+import { verifyMetaSignature } from "@/lib/webhook-verify";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /** Meta webhook verification handshake. */
 export function GET(req: NextRequest) {
@@ -21,8 +23,24 @@ export function GET(req: NextRequest) {
 
 /** Inbound WhatsApp messages → attach to the matching enquiry timeline. */
 export async function POST(req: NextRequest) {
+  const limited = enforceRateLimit(req, "wh:wa", {
+    limit: 120,
+    windowMs: 60_000,
+  });
+  if (limited) return limited;
+
   try {
-    const payload = await req.json();
+    const raw = await req.text();
+    if (
+      !verifyMetaSignature(
+        raw,
+        req.headers.get("x-hub-signature-256"),
+        process.env.META_APP_SECRET,
+      )
+    ) {
+      return new Response("Invalid signature", { status: 401 });
+    }
+    const payload = JSON.parse(raw || "{}");
     const changes =
       payload?.entry?.flatMap((e: any) => e.changes ?? []) ?? [];
 

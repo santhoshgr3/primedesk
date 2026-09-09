@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Link2, Check, Copy } from "lucide-react";
+import { Link2, Check, Copy, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/hooks/use-crm";
@@ -9,15 +9,17 @@ import { api } from "@/hooks/use-crm";
 export function ShareLinkButton({
   shortlistId,
   existingToken,
+  revoked,
   variant = "outline",
 }: {
   shortlistId: string;
   existingToken?: string | null;
+  revoked?: boolean;
   variant?: "outline" | "default";
 }) {
   const { toast } = useToast();
   const [url, setUrl] = useState(
-    existingToken
+    existingToken && !revoked
       ? `${typeof window !== "undefined" ? window.location.origin : ""}/s/${existingToken}`
       : "",
   );
@@ -44,6 +46,23 @@ export function ShareLinkButton({
     }
   }
 
+  async function revoke() {
+    if (!confirm("Turn off this client link? The client won't be able to open it."))
+      return;
+    setBusy(true);
+    try {
+      await api.jsonFetch(`/api/shortlists/${shortlistId}/share`, {
+        method: "DELETE",
+      });
+      setUrl("");
+      toast({ title: "Client link revoked", variant: "success" });
+    } catch (err: any) {
+      toast({ title: "Failed", description: err.message, variant: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function copy(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -62,10 +81,19 @@ export function ShareLinkButton({
           readOnly
           value={url}
           onFocus={(e) => e.currentTarget.select()}
-          className="h-9 w-56 rounded-md border border-input bg-muted px-2 text-xs"
+          className="h-9 w-52 rounded-md border border-input bg-muted px-2 text-xs"
         />
         <Button size="sm" variant="outline" onClick={() => copy(url)}>
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={revoke}
+          disabled={busy}
+          title="Revoke link"
+        >
+          <Ban className="size-4" />
         </Button>
       </div>
     );
@@ -74,7 +102,7 @@ export function ShareLinkButton({
   return (
     <Button size="sm" variant={variant} onClick={generate} disabled={busy}>
       <Link2 className="size-4" />
-      {busy ? "Generating…" : "Client link"}
+      {busy ? "Generating…" : revoked ? "New client link" : "Client link"}
     </Button>
   );
 }

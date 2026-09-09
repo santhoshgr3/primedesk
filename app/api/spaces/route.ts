@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','OPERATIONS']);
   if ("response" in guard) return guard.response;
   if (!["ADMIN", "OPERATIONS"].includes(guard.user.role))
     return ok({ error: "Forbidden" }, { status: 403 });

@@ -1,7 +1,10 @@
-import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { ClientShortlist } from "@/components/public/client-shortlist";
+import {
+  resolveShareToken,
+  SHARE_MESSAGES,
+} from "@/lib/services/shortlist-access";
 
 export const dynamic = "force-dynamic";
 
@@ -10,19 +13,22 @@ export default async function PublicShortlistPage({
 }: {
   params: { token: string };
 }) {
-  const shortlist = await prisma.shortlist.findUnique({
-    where: { shareToken: params.token },
-    include: {
-      enquiry: { select: { companyName: true, contactName: true, city: true } },
-      advisor: { select: { name: true, phone: true, email: true } },
-      items: {
-        orderBy: { rank: "asc" },
-        include: { space: { include: { operator: { select: { name: true } } } } },
-      },
-    },
-  });
+  const { state, shortlist } = await resolveShareToken(params.token);
 
-  if (!shortlist) notFound();
+  if (!shortlist) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
+        <div>
+          <p className="text-2xl font-semibold text-slate-700">
+            Link unavailable
+          </p>
+          <p className="mt-2 text-sm text-slate-500">
+            {SHARE_MESSAGES[state as "not_found"]}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!shortlist.viewedAt) {
     await prisma.shortlist.update({

@@ -31,7 +31,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','ADVISOR']);
   if ("response" in guard) return guard.response;
 
   try {

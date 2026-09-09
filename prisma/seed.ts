@@ -11,6 +11,18 @@ const hoursFromNow = (n: number) => new Date(Date.now() + n * 3600000);
 async function main() {
   console.log("🌱 Seeding PrimeDesk CRM…");
 
+  // ── Safety guard ──────────────────────────────────────────
+  // This seed WIPES every table. Only allow it against an empty database
+  // unless ALLOW_SEED=1 is explicitly set (dev reset).
+  const existingUsers = await prisma.user.count();
+  if (existingUsers > 0 && process.env.ALLOW_SEED !== "1") {
+    console.error(
+      `\n✋ Refusing to seed: database already has ${existingUsers} users.\n` +
+        `   This seed deletes all data. Re-run with ALLOW_SEED=1 to force.\n`,
+    );
+    process.exit(1);
+  }
+
   // ── Wipe (dev only) ────────────────────────────────────────
   await prisma.dealStageHistory.deleteMany();
   await prisma.document.deleteMany();

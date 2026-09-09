@@ -3,29 +3,23 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail, handleError } from "@/lib/api";
 import { logActivity } from "@/lib/services/enquiry";
+import { resolveShareToken, SHARE_MESSAGES } from "@/lib/services/shortlist-access";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /** Public — no auth. The client's browser reads the shortlist by token. */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { token: string } },
 ) {
+  const limited = enforceRateLimit(req, "pub:sl:get", {
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (limited) return limited;
+
   try {
-    const shortlist = await prisma.shortlist.findUnique({
-      where: { shareToken: params.token },
-      include: {
-        enquiry: { select: { companyName: true, contactName: true, city: true } },
-        advisor: { select: { name: true, phone: true, email: true } },
-        items: {
-          orderBy: { rank: "asc" },
-          include: {
-            space: {
-              include: { operator: { select: { name: true } } },
-            },
-          },
-        },
-      },
-    });
-    if (!shortlist) return fail("Link not found or expired", 404);
+    const { state, shortlist } = await resolveShareToken(params.token);
+    if (!shortlist) return fail(SHARE_MESSAGES[state as "not_found"], 404);
 
     if (!shortlist.viewedAt) {
       await prisma.shortlist.update({
@@ -57,16 +51,19 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { token: string } },
 ) {
+  const limited = enforceRateLimit(req, "pub:sl:post", {
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (limited) return limited;
+
   try {
     const { preferredSpaceIds, note, wantsVisit } = bodySchema.parse(
       await req.json(),
     );
 
-    const shortlist = await prisma.shortlist.findUnique({
-      where: { shareToken: params.token },
-      include: { items: true, enquiry: true },
-    });
-    if (!shortlist) return fail("Link not found", 404);
+    const { state, shortlist } = await resolveShareToken(params.token);
+    if (!shortlist) return fail(SHARE_MESSAGES[state as "not_found"], 404);
 
     await prisma.$transaction([
       prisma.shortlistItem.updateMany({
@@ -90,9 +87,9 @@ export async function POST(
       }),
     ]);
 
-    const picked = shortlist.items
-      .filter((i) => preferredSpaceIds.includes(i.spaceId))
-      .length;
+    const picked = shortlist.items.filter((i) =>
+      preferredSpaceIds.includes(i.spaceId),
+    ).length;
 
     await logActivity(
       shortlist.enquiryId,
@@ -103,7 +100,6 @@ export async function POST(
       "system",
     );
 
-    // Nudge the advisor.
     await prisma.task.create({
       data: {
         type: wantsVisit ? "SITE_VISIT" : "FOLLOW_UP",

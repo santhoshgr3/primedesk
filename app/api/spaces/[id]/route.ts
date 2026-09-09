@@ -29,7 +29,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','OPERATIONS']);
   if ("response" in guard) return guard.response;
 
   try {
@@ -52,7 +52,7 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const guard = await withAuth();
+  const guard = await withAuth(['ADMIN','OPERATIONS']);
   if ("response" in guard) return guard.response;
   if (!["ADMIN", "OPERATIONS"].includes(guard.user.role))
     return fail("Forbidden", 403);
