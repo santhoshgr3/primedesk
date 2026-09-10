@@ -4,6 +4,7 @@ import { pickAdvisor } from "@/lib/services/assignment";
 import { getSettings } from "@/lib/settings";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import { scoreEnquiry } from "@/lib/services/scoring";
+import { notify } from "@/lib/services/notify";
 
 /**
  * Auto-task rules — every status transition should leave the enquiry with a
@@ -221,6 +222,17 @@ export async function createInboundEnquiry(input: InboundInput) {
 
   await scoreEnquiry(enquiry.id).catch(() => {});
 
+  if (assignedToId) {
+    await notify(assignedToId, {
+      type: "new_lead",
+      title: `New lead: ${enquiry.companyName}`,
+      body: `${enquiry.seatsNeeded} seats · ${enquiry.city} · via ${input.source
+        .replace(/_/g, " ")
+        .toLowerCase()}`,
+      link: `/enquiries/${enquiry.id}`,
+    });
+  }
+
   return enquiry;
 }
 
@@ -260,6 +272,15 @@ export async function assignAdvisor(
       priority: "HIGH",
     },
   });
+
+  if (advisorId !== actorId) {
+    await notify(advisorId, {
+      type: "assigned",
+      title: `You were assigned ${enquiry.companyName}`,
+      body: `${enquiry.seatsNeeded} seats · ${enquiry.city}`,
+      link: `/enquiries/${enquiryId}`,
+    });
+  }
 
   return enquiry;
 }

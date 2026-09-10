@@ -5,6 +5,7 @@ import { ok, fail, handleError } from "@/lib/api";
 import { logActivity } from "@/lib/services/enquiry";
 import { resolveShareToken, SHARE_MESSAGES } from "@/lib/services/shortlist-access";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { notify } from "@/lib/services/notify";
 
 /** Public — no auth. The client's browser reads the shortlist by token. */
 export async function GET(
@@ -111,6 +112,15 @@ export async function POST(
         assignedToId: shortlist.advisorId,
         priority: "HIGH",
       },
+    });
+
+    await notify(shortlist.advisorId, {
+      type: "shortlist_response",
+      title: `${shortlist.enquiry.companyName} responded to the shortlist`,
+      body: wantsVisit
+        ? `Wants a visit · ${picked} space(s) preferred`
+        : `${picked} space(s) preferred`,
+      link: `/enquiries/${shortlist.enquiryId}`,
     });
 
     return ok({ received: true });

@@ -8,6 +8,7 @@ import { GlobalSearch } from "@/components/layout/global-search";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { CommandPalette } from "@/components/layout/command-palette";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 export function Topbar({
   user,
@@ -23,7 +24,8 @@ export function Topbar({
       <div className="min-w-0 flex-1">
         <GlobalSearch />
       </div>
-      <div className="flex items-center gap-2 lg:gap-3">
+      <div className="flex items-center gap-1.5 lg:gap-2">
+        <NotificationBell />
         <ThemeToggle />
         <div className="hidden text-right leading-tight sm:block">
           <p className="text-sm font-medium">{user.name ?? "User"}</p>

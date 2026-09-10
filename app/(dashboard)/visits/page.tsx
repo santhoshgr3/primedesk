@@ -236,13 +236,19 @@ function OutcomeDialog({
         visit.scheduledAt,
       ).toLocaleString("en-IN")}`}
     >
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap gap-3">
         <Link
           href={`/enquiries/${visit.enquiry.id}`}
           className="text-xs font-medium text-primary hover:underline"
         >
           Open enquiry →
         </Link>
+        <a
+          href={`/api/visits/${visit.id}/ics`}
+          className="text-xs font-medium text-primary hover:underline"
+        >
+          Add to calendar (.ics)
+        </a>
       </div>
 
       {!done ? (

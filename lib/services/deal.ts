@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { DealStage } from "@prisma/client";
 import { logActivity } from "@/lib/services/enquiry";
+import { notify } from "@/lib/services/notify";
 
 /** Commission = operator rate % × first month's value (PLAN Workflow 3). */
 export function computeCommission(
@@ -132,6 +133,21 @@ export async function moveDealStage(
 
     return d;
   });
+
+  if (movedIn && deal.advisorId !== userId) {
+    const e = await prisma.enquiry.findUnique({
+      where: { id: deal.enquiryId },
+      select: { companyName: true },
+    });
+    await notify(deal.advisorId, {
+      type: "deal_won",
+      title: `Deal won 🎉 — ${e?.companyName ?? "client"}`,
+      body: `${deal.seats} seats · ₹${Math.round(
+        deal.monthlyValue,
+      ).toLocaleString("en-IN")}/mo`,
+      link: `/pipeline?deal=${deal.id}`,
+    });
+  }
 
   return updated;
 }

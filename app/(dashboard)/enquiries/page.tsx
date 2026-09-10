@@ -30,6 +30,7 @@ import {
 } from "@/lib/constants";
 import { useEnquiries, useAdvisors } from "@/hooks/use-enquiries";
 import { api } from "@/hooks/use-crm";
+import { ImportDialog } from "@/components/enquiries/import-dialog";
 
 const PRIORITY_DOT: Record<string, string> = {
   hot: "bg-red-500",
@@ -175,7 +176,8 @@ export default function EnquiriesPage() {
         title="Enquiries"
         description="Every company looking for office space, from first touch to closed lease."
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <ImportDialog />
             <Button asChild variant="outline">
               <a href={exportUrl}>
                 <Download className="size-4" /> Export CSV

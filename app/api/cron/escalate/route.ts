@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authorizeCron } from "@/lib/cron";
 import { getSettings } from "@/lib/settings";
+import { notify } from "@/lib/services/notify";
 
 /**
  * Escalates tasks that have been overdue longer than the SLA threshold
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
     });
     if (dupe) continue;
 
+    const owner = admins[escalated % admins.length].id;
     await prisma.task.create({
       data: {
         type: t.type,
@@ -52,9 +54,17 @@ export async function POST(req: NextRequest) {
         }`,
         dueDate: new Date(Date.now() + 4 * 3600 * 1000),
         enquiryId: t.enquiryId,
-        assignedToId: admins[escalated % admins.length].id,
+        assignedToId: owner,
         priority: "URGENT",
       },
+    });
+    await notify(owner, {
+      type: "task_escalation",
+      title: `Overdue task escalated${
+        t.enquiry ? ` — ${t.enquiry.companyName}` : ""
+      }`,
+      body: t.title,
+      link: t.enquiryId ? `/enquiries/${t.enquiryId}` : "/tasks",
     });
     escalated++;
   }

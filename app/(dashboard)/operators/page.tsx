@@ -153,11 +153,36 @@ function SpacesTab() {
   const params = useMemo(() => ({ ...filters, pageSize: "100" }), [filters]);
   const { data, isLoading } = useSpaces(params);
   const [edit, setEdit] = useState<any>(null);
+  const [compare, setCompare] = useState<string[]>([]);
   const set = (k: keyof typeof filters) => (v: string) =>
     setFilters((f) => ({ ...f, [k]: v }));
 
+  const toggleCompare = (id: string) =>
+    setCompare((c) =>
+      c.includes(id) ? c.filter((x) => x !== id) : c.length < 3 ? [...c, id] : c,
+    );
+
   return (
     <Card>
+      {compare.length > 0 && (
+        <div className="flex items-center justify-between border-b bg-primary/5 px-3 py-2 text-sm">
+          <span>{compare.length} selected to compare (max 3)</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCompare([])}
+              className="text-xs text-muted-foreground hover:underline"
+            >
+              Clear
+            </button>
+            <a
+              href={`/spaces/compare?ids=${compare.join(",")}`}
+              className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground"
+            >
+              Compare →
+            </a>
+          </div>
+        </div>
+      )}
       <div className="grid gap-2 p-3 md:grid-cols-3 lg:grid-cols-5">
         <Input placeholder="Search…" value={filters.q} onChange={(e) => set("q")(e.target.value)} />
         <Select placeholder="All cities" value={filters.city} onChange={(e) => set("city")(e.target.value)}>
@@ -172,6 +197,7 @@ function SpacesTab() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-8" />
             <TableHead>Space</TableHead>
             <TableHead>Operator</TableHead>
             <TableHead>Location</TableHead>
@@ -179,12 +205,13 @@ function SpacesTab() {
             <TableHead className="text-right">Avail / Total</TableHead>
             <TableHead className="text-right">₹/seat</TableHead>
             <TableHead>Verified</TableHead>
+            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Loading…</TableCell>
+              <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">Loading…</TableCell>
             </TableRow>
           )}
           {data?.rows.map((s: any) => {
@@ -194,9 +221,19 @@ function SpacesTab() {
             return (
               <TableRow key={s.id}>
                 <TableCell>
-                  <button onClick={() => setEdit(s)} className="font-medium hover:underline">
+                  <input
+                    type="checkbox"
+                    checked={compare.includes(s.id)}
+                    onChange={() => toggleCompare(s.id)}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Link
+                    href={`/spaces/${s.id}`}
+                    className="font-medium hover:underline"
+                  >
                     {s.name}
-                  </button>
+                  </Link>
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{s.operator.name}</TableCell>
                 <TableCell className="text-xs">{s.microMarket}, {s.city}</TableCell>
@@ -218,6 +255,14 @@ function SpacesTab() {
                       <ShieldCheck className="size-3" /> {timeAgo(s.lastVerifiedAt)}
                     </span>
                   )}
+                </TableCell>
+                <TableCell>
+                  <button
+                    onClick={() => setEdit(s)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Edit
+                  </button>
                 </TableCell>
               </TableRow>
             );
