@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link2, Check, Copy, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { useConfirm } from "@/components/ui/confirm";
 import { api } from "@/hooks/use-crm";
 
 export function ShareLinkButton({
@@ -18,6 +19,7 @@ export function ShareLinkButton({
   variant?: "outline" | "default";
 }) {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [url, setUrl] = useState(
     existingToken && !revoked
       ? `${typeof window !== "undefined" ? window.location.origin : ""}/s/${existingToken}`
@@ -47,8 +49,13 @@ export function ShareLinkButton({
   }
 
   async function revoke() {
-    if (!confirm("Turn off this client link? The client won't be able to open it."))
-      return;
+    const ok = await confirm({
+      title: "Revoke client link?",
+      body: "The client won't be able to open it anymore. You can generate a new one later.",
+      confirmText: "Revoke",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await api.jsonFetch(`/api/shortlists/${shortlistId}/share`, {

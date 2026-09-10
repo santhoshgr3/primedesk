@@ -170,10 +170,17 @@ function OutcomeDialog({
   onClose: () => void;
 }) {
   const { toast } = useToast();
+  const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
 
   if (!visit) return null;
   const done = visit.status === "done";
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["visits"] });
+    qc.invalidateQueries({ queryKey: ["tasks"] });
+    qc.invalidateQueries({ queryKey: ["deals"] });
+  };
 
   async function setStatus(status: string) {
     setBusy(true);
@@ -183,8 +190,8 @@ function OutcomeDialog({
         body: JSON.stringify({ status }),
       });
       toast({ title: `Marked ${status.replace(/_/g, " ")}`, variant: "success" });
+      refresh();
       onClose();
-      location.reload();
     } catch (err: any) {
       toast({ title: "Failed", description: err.message, variant: "error" });
     } finally {
@@ -211,8 +218,8 @@ function OutcomeDialog({
         description: res.deal ? "Deal auto-created." : undefined,
         variant: "success",
       });
+      refresh();
       onClose();
-      location.reload();
     } catch (err: any) {
       toast({ title: "Failed", description: err.message, variant: "error" });
     } finally {

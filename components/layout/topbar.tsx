@@ -5,19 +5,27 @@ import { LogOut } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { titleCase } from "@/lib/utils";
 import { GlobalSearch } from "@/components/layout/global-search";
+import { MobileNav } from "@/components/layout/mobile-nav";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { CommandPalette } from "@/components/layout/command-palette";
 
 export function Topbar({
   user,
+  badges,
 }: {
   user: { name?: string | null; email?: string | null; role: string };
+  badges?: Partial<Record<string, number>>;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-card px-4 lg:px-6">
-      <div className="hidden flex-1 md:block">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-3 lg:gap-4 lg:px-6">
+      <CommandPalette />
+      <MobileNav badges={badges} />
+      <div className="min-w-0 flex-1">
         <GlobalSearch />
       </div>
-      <div className="ml-auto flex items-center gap-3">
-        <div className="text-right leading-tight">
+      <div className="flex items-center gap-2 lg:gap-3">
+        <ThemeToggle />
+        <div className="hidden text-right leading-tight sm:block">
           <p className="text-sm font-medium">{user.name ?? "User"}</p>
           <p className="text-[11px] text-muted-foreground">
             {titleCase(user.role)}

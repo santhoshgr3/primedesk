@@ -14,6 +14,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Avatar } from "@/components/ui/avatar";
 import { Tabs } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
+import { useConfirm } from "@/components/ui/confirm";
 import {
   Table,
   TableBody,
@@ -59,9 +60,19 @@ export default function TeamPage() {
 function Members() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { data: users, isLoading } = useTeam();
 
   async function toggle(id: string, isActive: boolean) {
+    if (isActive) {
+      const ok = await confirm({
+        title: "Deactivate this member?",
+        body: "They lose access immediately and their open enquiries are auto-reassigned.",
+        confirmText: "Deactivate",
+        destructive: true,
+      });
+      if (!ok) return;
+    }
     try {
       const res = await api.jsonFetch<any>(`/api/team/${id}`, {
         method: "PATCH",

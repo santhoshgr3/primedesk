@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
+import { Pagination } from "@/components/ui/pagination";
 import {
   Table,
   TableBody,
@@ -68,6 +69,7 @@ export default function EnquiriesPage() {
   const [customViews, setCustomViews] = useState<
     { name: string; filters: Filters }[]
   >([]);
+  const [namingView, setNamingView] = useState(false);
 
   useEffect(() => {
     try {
@@ -77,6 +79,8 @@ export default function EnquiriesPage() {
       /* ignore */
     }
   }, []);
+
+  const [page, setPage] = useState(1);
 
   const presets: { name: string; filters: Partial<Filters> }[] = [
     { name: "All", filters: {} },
@@ -92,22 +96,24 @@ export default function EnquiriesPage() {
 
   const applyView = (f: Partial<Filters>) => {
     setSelected(new Set());
+    setPage(1);
     setFilters({ ...EMPTY, ...f });
   };
 
   const activePreset = (f: Partial<Filters>) =>
     JSON.stringify({ ...EMPTY, ...f }) === JSON.stringify(filters);
 
-  const saveView = () => {
-    const name = prompt("Name this view:");
-    if (!name) return;
+  const saveView = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
     const next = [
-      ...customViews.filter((v) => v.name !== name),
-      { name, filters },
+      ...customViews.filter((v) => v.name !== trimmed),
+      { name: trimmed, filters },
     ];
     setCustomViews(next);
     localStorage.setItem(VIEWS_KEY, JSON.stringify(next));
-    toast({ title: `Saved view “${name}”`, variant: "success" });
+    setNamingView(false);
+    toast({ title: `Saved view “${trimmed}”`, variant: "success" });
   };
 
   const deleteView = (name: string) => {
@@ -116,11 +122,15 @@ export default function EnquiriesPage() {
     localStorage.setItem(VIEWS_KEY, JSON.stringify(next));
   };
 
-  const params = useMemo(() => ({ ...filters, pageSize: "50" }), [filters]);
+  const params = useMemo(
+    () => ({ ...filters, page: String(page), pageSize: "25" }),
+    [filters, page],
+  );
   const { data, isLoading, isError } = useEnquiries(params);
 
   const set = (k: keyof typeof filters) => (v: string) => {
     setSelected(new Set());
+    setPage(1);
     setFilters((f) => ({ ...f, [k]: v }));
   };
 
@@ -209,12 +219,33 @@ export default function EnquiriesPage() {
             </button>
           </span>
         ))}
-        <button
-          onClick={saveView}
-          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <Star className="size-3" /> Save view
-        </button>
+        {namingView ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveView(
+                (e.currentTarget.elements.namedItem("v") as HTMLInputElement)
+                  .value,
+              );
+            }}
+            className="inline-flex items-center gap-1"
+          >
+            <input
+              name="v"
+              autoFocus
+              placeholder="View name…"
+              onBlur={() => setNamingView(false)}
+              className="h-7 w-32 rounded-full border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </form>
+        ) : (
+          <button
+            onClick={() => setNamingView(true)}
+            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <Star className="size-3" /> Save view
+          </button>
+        )}
       </div>
 
       <Card className="mb-4 p-3">
@@ -366,9 +397,12 @@ export default function EnquiriesPage() {
       </Card>
 
       {data && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          {data.total} enquir{data.total === 1 ? "y" : "ies"}
-        </p>
+        <Pagination
+          page={page}
+          pageSize={25}
+          total={data.total}
+          onPage={setPage}
+        />
       )}
     </div>
   );
