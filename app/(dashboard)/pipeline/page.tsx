@@ -24,6 +24,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { DealCard } from "@/components/pipeline/deal-card";
+import { DealDocuments } from "@/components/pipeline/deal-documents";
 import { api, useDeals } from "@/hooks/use-crm";
 import { DEAL_STAGES } from "@/lib/constants";
 import { formatINR, titleCase } from "@/lib/utils";
@@ -313,6 +314,10 @@ function DealDialog({ deal, onClose }: { deal: any; onClose: () => void }) {
           </Button>
         </div>
       </form>
+
+      <div className="mt-4 border-t pt-4">
+        <DealDocuments dealId={deal.id} />
+      </div>
     </Dialog>
   );
 }

@@ -23,3 +23,6 @@ tsconfig.tsbuildinfo
 
 # stray desktop output folder
 Claude outputs/
+
+# local uploaded files (deal documents)
+uploads/

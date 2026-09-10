@@ -42,7 +42,10 @@ function Builder() {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const selectedIds = new Set(selected.map((s) => s.spaceId));
+  const selectedIds = useMemo(
+    () => new Set(selected.map((s) => s.spaceId)),
+    [selected],
+  );
   const filtered = useMemo(
     () =>
       (matches ?? []).filter(

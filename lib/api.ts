@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import type { UserRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { captureError } from "@/lib/observability";
 
 export type ApiUser = {
   id: string;
@@ -79,7 +80,7 @@ export function handleError(err: unknown) {
   ) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  console.error("[api] unhandled error:", err);
+  void captureError(err, { scope: "api" });
   return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 }
 

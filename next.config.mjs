@@ -7,7 +7,8 @@ const nextConfig = {
     ],
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    // Lint runs in CI and `next build`. Keep it honest.
+    dirs: ["app", "components", "lib", "hooks"],
   },
 };
 
