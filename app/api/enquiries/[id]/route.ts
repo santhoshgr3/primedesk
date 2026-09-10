@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withAuth, ok, fail, handleError } from "@/lib/api";
 import { updateEnquirySchema } from "@/lib/validators/enquiry";
 import { changeStatus, logActivity } from "@/lib/services/enquiry";
+import { seatBounds } from "@/lib/seats";
 
 export async function GET(
   _req: NextRequest,
@@ -57,6 +58,12 @@ export async function PATCH(
     const cleaned = Object.fromEntries(
       Object.entries(fields).filter(([, v]) => v !== undefined && v !== ""),
     );
+
+    if (typeof cleaned.seatsNeeded === "string") {
+      const b = seatBounds(cleaned.seatsNeeded);
+      cleaned.seatsMin = b.min;
+      cleaned.seatsMax = b.max;
+    }
 
     if (Object.keys(cleaned).length) {
       await prisma.enquiry.update({

@@ -1,12 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Enquiry, Space } from "@prisma/client";
-
-const SEAT_BOUNDS: Record<string, [number, number]> = {
-  "20-50": [20, 50],
-  "50-100": [50, 100],
-  "100-200": [100, 200],
-  "200+": [200, 100000],
-};
+import { seatBounds } from "@/lib/seats";
 
 export type ScoredSpace = Space & {
   operator: { id: string; name: string };
@@ -22,17 +16,21 @@ export async function matchSpaces(
   enquiry: Enquiry,
   opts: { limit?: number } = {},
 ): Promise<ScoredSpace[]> {
+  const fallback = seatBounds(enquiry.seatsNeeded);
+  const minSeat = enquiry.seatsMin ?? fallback.min;
+  const maxSeat = enquiry.seatsMax ?? fallback.max;
+  const budget = enquiry.budgetPerSeat ?? null;
+
   const spaces = await prisma.space.findMany({
     where: {
       isActive: true,
       status: { in: ["active", "waitlisted"] },
       city: enquiry.city,
+      // pre-filter in the DB: at least half the needed seats must be available
+      availableSeats: { gte: Math.floor(minSeat / 2) },
     },
     include: { operator: { select: { id: true, name: true } } },
   });
-
-  const [minSeat, maxSeat] = SEAT_BOUNDS[enquiry.seatsNeeded] ?? [0, 100000];
-  const budget = enquiry.budgetPerSeat ?? null;
 
   const scored = spaces.map((s): ScoredSpace => {
     let score = 40; // in-city baseline

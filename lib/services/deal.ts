@@ -92,6 +92,7 @@ export async function moveDealStage(
         commissionValue: movedIn
           ? computeCommission(deal.monthlyValue, deal.commissionRate)
           : deal.commissionValue,
+        version: { increment: 1 },
       },
     });
 

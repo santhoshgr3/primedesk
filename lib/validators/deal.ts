@@ -36,6 +36,7 @@ export const updateDealSchema = z.object({
   coBrokerSplit: z.coerce.number().min(0).max(100).optional(),
   notes: z.string().optional(),
   lostReason: z.string().optional(),
+  expectedVersion: z.number().int().optional(), // optimistic-concurrency guard
 });
 
 export const moveStageSchema = z.object({

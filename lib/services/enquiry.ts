@@ -5,6 +5,7 @@ import { getSettings } from "@/lib/settings";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import { scoreEnquiry } from "@/lib/services/scoring";
 import { notify } from "@/lib/services/notify";
+import { seatBounds } from "@/lib/seats";
 
 /**
  * Auto-task rules — every status transition should leave the enquiry with a
@@ -168,6 +169,8 @@ export async function createInboundEnquiry(input: InboundInput) {
       contactPhone: input.contactPhone,
       contactEmail: input.contactEmail || null,
       seatsNeeded: input.seatsNeeded,
+      seatsMin: seatBounds(input.seatsNeeded).min,
+      seatsMax: seatBounds(input.seatsNeeded).max,
       city: input.city,
       microMarket: input.microMarket || null,
       workspaceType: input.workspaceType ?? "NOT_SURE",

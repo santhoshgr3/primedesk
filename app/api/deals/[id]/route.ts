@@ -35,9 +35,21 @@ export async function PATCH(
   if ("response" in guard) return guard.response;
 
   try {
-    const data = updateDealSchema.parse(await req.json());
+    const { expectedVersion, ...data } = updateDealSchema.parse(
+      await req.json(),
+    );
     const existing = await prisma.deal.findUnique({ where: { id: params.id } });
     if (!existing) return fail("Not found", 404);
+
+    if (
+      typeof expectedVersion === "number" &&
+      expectedVersion !== existing.version
+    ) {
+      return fail(
+        "This deal was changed by someone else — reload and try again.",
+        409,
+      );
+    }
 
     const seats = data.seats ?? existing.seats;
     const pricePerSeat = data.pricePerSeat ?? existing.pricePerSeat;
@@ -50,6 +62,7 @@ export async function PATCH(
         ...data,
         monthlyValue,
         commissionValue: computeCommission(monthlyValue, commissionRate),
+        version: { increment: 1 },
       },
     });
 

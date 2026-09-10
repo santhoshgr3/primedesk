@@ -6,6 +6,7 @@ import { fullEnquirySchema } from "@/lib/validators/enquiry";
 import { logActivity } from "@/lib/services/enquiry";
 import { scoreEnquiry } from "@/lib/services/scoring";
 import { writeAudit } from "@/lib/services/audit";
+import { seatBounds } from "@/lib/seats";
 
 const HEADER_ALIASES: Record<string, string> = {
   company: "companyName",
@@ -157,6 +158,8 @@ export async function POST(req: NextRequest) {
           contactEmail: d.contactEmail || null,
           industry: d.industry || null,
           seatsNeeded: d.seatsNeeded,
+          seatsMin: seatBounds(d.seatsNeeded).min,
+          seatsMax: seatBounds(d.seatsNeeded).max,
           city: d.city,
           microMarket: d.microMarket || null,
           workspaceType: d.workspaceType,

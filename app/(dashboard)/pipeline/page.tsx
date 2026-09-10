@@ -215,6 +215,7 @@ function DealDialog({ deal, onClose }: { deal: any; onClose: () => void }) {
       await api.jsonFetch(`/api/deals/${deal.id}`, {
         method: "PATCH",
         body: JSON.stringify({
+          expectedVersion: deal.version,
           seats: fd.get("seats"),
           pricePerSeat: fd.get("pricePerSeat"),
           lockInMonths: fd.get("lockInMonths") || undefined,
@@ -231,7 +232,15 @@ function DealDialog({ deal, onClose }: { deal: any; onClose: () => void }) {
       toast({ title: "Deal updated", variant: "success" });
       onClose();
     } catch (err: any) {
-      toast({ title: "Failed", description: err.message, variant: "error" });
+      toast({
+        title: "Couldn't save",
+        description: err.message,
+        variant: "error",
+      });
+      if (String(err.message).includes("changed by someone else")) {
+        qc.invalidateQueries({ queryKey: ["deals"] });
+        onClose();
+      }
     } finally {
       setBusy(false);
     }

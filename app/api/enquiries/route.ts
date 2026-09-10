@@ -5,6 +5,7 @@ import { withAuth, ok, handleError, parsePagination } from "@/lib/api";
 import { fullEnquirySchema } from "@/lib/validators/enquiry";
 import { logActivity } from "@/lib/services/enquiry";
 import { scoreEnquiry } from "@/lib/services/scoring";
+import { seatBounds } from "@/lib/seats";
 
 export async function GET(req: NextRequest) {
   const guard = await withAuth();
@@ -72,6 +73,8 @@ export async function POST(req: NextRequest) {
         contactEmail: data.contactEmail || null,
         contactDesig: data.contactDesig || null,
         seatsNeeded: data.seatsNeeded,
+        seatsMin: seatBounds(data.seatsNeeded).min,
+        seatsMax: seatBounds(data.seatsNeeded).max,
         city: data.city,
         microMarket: data.microMarket || null,
         workspaceType: data.workspaceType,
